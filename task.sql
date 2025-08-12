@@ -1,63 +1,60 @@
--- Use our database
-USE ShopDB; 
+DROP DATABASE IF EXISTS ShopDB;
 
-INSERT INTO Products (Name, Description, Price, WarehouseAmount)
-VALUES ('AwersomeProduct', 'Product Description', 5, 42);
+CREATE DATABASE ShopDB;
+USE ShopDB;
 
-INSERT INTO Customers (FirstName, LastName, Email, Address)
-VALUES ('John', 'Dou', 'j@dou.ua', 'far, far away');
+DROP DATABASE IF EXISTS ShopDB;
+CREATE DATABASE ShopDB;
+USE ShopDB;
 
--- Start the transaction 
+CREATE TABLE Products (
+    ID INT AUTO_INCREMENT,
+    Name VARCHAR(50),
+    Description VARCHAR(100),
+    Price INT,
+    WarehouseAmount INT,
+    PRIMARY KEY(ID)
+);
+
+CREATE TABLE Customers (
+    ID INT AUTO_INCREMENT,
+    FirstName VARCHAR(50),
+    LastName VARCHAR(50),
+    Email VARCHAR(50),
+    Address VARCHAR(100),
+    PRIMARY KEY(ID)
+);
+
+CREATE TABLE Orders (
+    ID INT AUTO_INCREMENT,
+    CustomerID INT NULL,
+    Date DATE,
+    PRIMARY KEY(ID),
+    FOREIGN KEY (CustomerID) REFERENCES Customers(ID) ON DELETE SET NULL
+);
+
+CREATE TABLE OrderItems (
+    ID INT AUTO_INCREMENT,
+    Count INT,
+    OrderID INT NULL,
+    ProductID INT NULL,
+    PRIMARY KEY(ID),
+    FOREIGN KEY (OrderID) REFERENCES Orders(ID) ON DELETE SET NULL,
+    FOREIGN KEY (ProductID) REFERENCES Products(ID) ON DELETE SET NULL
+);
+
 START TRANSACTION;
 
--- 1. Добавляем клиента, если не существует
-INSERT INTO Customers (CustomerName)
-SELECT 'John Doe'
-WHERE NOT EXISTS (
-    SELECT 1 FROM Customers WHERE CustomerName = 'John Doe'
-);
+INSERT INTO Orders (CustomerID, Date)
+VALUES (1, '2025-03-05');
 
--- Получаем ID клиента
-SET @customerId = (SELECT CustomerID FROM Customers WHERE CustomerName = 'John Doe');
+SET @order_id = LAST_INSERT_ID();
 
--- 2. Добавляем продукт, если не существует
-INSERT INTO Products (ProductName, WarehouseAmount)
-SELECT 'Laptop', 10
-WHERE NOT EXISTS (
-    SELECT 1 FROM Products WHERE ProductName = 'Laptop'
-);
+INSERT INTO OrderItems (OrderID, ProductID, Count)
+VALUES (@order_id, 1, 1);
 
--- Получаем ID продукта
-SET @productId = (SELECT ProductID FROM Products WHERE ProductName = 'Laptop');
-
--- 3. Проверка и блокировка склада
-SELECT WarehouseAmount
-INTO @stock
-FROM Products
-WHERE ProductID = @productId
-FOR UPDATE;
-
--- Если товара не хватает — откат
-IF @stock < 1 THEN
-    ROLLBACK;
-    SIGNAL SQLSTATE '45000'
-        SET MESSAGE_TEXT = 'Insufficient stock for product';
-END IF;
-
--- 4. Создаем заказ
-INSERT INTO Orders (CustomerID, OrderDate)
-VALUES (@customerId, NOW());
-
--- Получаем ID заказа
-SET @orderId = LAST_INSERT_ID();
-
--- 5. Добавляем детали заказа
-INSERT INTO OrderDetails (OrderID, ProductID, Quantity)
-VALUES (@orderId, @productId, 1);
-
--- 6. Обновляем количество на складе
 UPDATE Products
 SET WarehouseAmount = WarehouseAmount - 1
-WHERE ProductID = @productId;
+WHERE ID = 1;
 
-COMMIT; 
+COMMIT;
